@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/contrast"
+        android:orderInCategory="100"
+        android:title="@string/contrast"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/brightness"
+        android:orderInCategory="100"
+        android:title="@string/brightness"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/saturation"
+        android:orderInCategory="100"
+        android:title="@string/saturation"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/off"
+        android:orderInCategory="100"
+        android:title="@string/off"
+        app:showAsAction="never" />
+</menu>

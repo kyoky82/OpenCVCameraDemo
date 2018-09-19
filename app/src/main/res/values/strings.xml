@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">OpenCVCamDemo</string>
+    <string name="contrast">contrast</string>
+    <string name="brightness">brightness</string>
+    <string name="saturation">saturation</string>
+    <string name="off">off</string>
 </resources>
