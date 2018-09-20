@@ -1,7 +1,9 @@
 package com.example.xuxiaojiang_os.opencvcamdemo;
 
-import android.graphics.ImageFormat;
-import android.graphics.YuvImage;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
@@ -13,6 +15,14 @@ import android.view.SurfaceView;
 import android.view.SurfaceHolder;
 import android.view.Window;
 import android.view.WindowManager;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.IOException;
 
@@ -54,6 +64,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+
+        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_4_0, this, mOpenCVCallBack);
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.optionmenu, menu);
 
@@ -92,7 +109,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             e.printStackTrace();
         }
 
-        mCamera.setDisplayOrientation(90);
+        //mCamera.setDisplayOrientation(90);
         Camera.Parameters mParameters = mCamera.getParameters();
         mParameters.setPreviewSize(1920, 1080 );
         mCamera.setParameters(mParameters);
@@ -173,21 +190,56 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         protected Object doInBackground(Object[] objects) {
             Log.d(Tag, "doInBackground enter!");
 
-            doOpenCvProcess(mAction);
+            long start = System.currentTimeMillis();
+
+            // convert NV21 to BGR
+            Camera.Size size = mCamera.getParameters().getPreviewSize();
+            final int w = size.width;
+            final int h = size.height;
+            Mat mat = new Mat((int)(h*1.5), w, CvType.CV_8UC1);
+            mat.put(0, 0, mData);
+            Mat bgr_i420 = new Mat();
+            Imgproc.cvtColor(mat, bgr_i420, Imgproc.COLOR_YUV2BGR_NV12);
+
+            long cvtend = System.currentTimeMillis();
+            Log.d(Tag, "convert yuv to bgr time: " + (cvtend - start));
+
+            // Do opencv process
+            doOpenCvProcess(bgr_i420, mAction);
+
+            long procend = System.currentTimeMillis();
+            Log.d(Tag, "opencv process time: " + (procend - cvtend));
+
+            showOpenCvView(bgr_i420, w, h);
+            long showView = System.currentTimeMillis();
+            Log.d(Tag, "opencv showView time: " + (showView - procend));
+
+            // convert bgr to nv21
+            /*
+            Mat result = new Mat();
+            Imgproc.cvtColor(bgr_i420, result, Imgproc.COLOR_BGR2YUV_I420);
+            byte[] data_result = new byte[(int)(w*h*1.5)];
+            result.get(0, 0, data_result);
+
+            long cvtagain = System.currentTimeMillis();
+            Log.d(Tag, "convert bgr to yuv time: " + (cvtagain - procend));
+            */
+
+            getPreviewData();
 
             return null;
         }
 
-        private void doOpenCvProcess(int action){
+        private void doOpenCvProcess(Mat mat, int action){
             switch(action){
                 case ACTION_CONTRAST:
-                    contrastProc();
+                    contrastProc(mat);
                     break;
                 case ACTION_BRIGHTNESS:
-                    brightnessProc();
+                    brightnessProc(mat);
                     break;
                 case ACTION_SATURATION:
-                    saturationProc();
+                    saturationProc(mat);
                     break;
                 case ACTION_NONE:
                 default:
@@ -195,16 +247,62 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             }
         }
 
-        private void contrastProc(){
+        private void contrastProc(Mat mat){
             Log.d(Tag, "contrast process enter!");
         }
 
-        private void brightnessProc(){
+        private void brightnessProc(Mat mat){
             Log.d(Tag, "brightness process enter!");
         }
 
-        private void saturationProc(){
+        private void saturationProc(Mat mat){
             Log.d(Tag, "saturation process enter!");
         }
     }
+
+    private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
+        @Override
+        public void onManagerConnected(int status) {
+            switch(status) {
+                case LoaderCallbackInterface.SUCCESS:
+                    break;
+                default:
+                    super.onManagerConnected(status);
+                    break;
+            }
+        }
+    };
+
+    private void showOpenCvView(Mat mat, int width, int height){
+        Bitmap bitMap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+
+        if(null == mat){
+            return;
+        }
+
+        Utils.matToBitmap(mat,bitMap);
+        Canvas canvas = mOpenCVHolder.lockCanvas();
+        if(null != canvas){
+            canvas.drawColor(0, PorterDuff.Mode.CLEAR );
+
+            // 修改预览旋转90度问题
+            /*
+            canvas.rotate(90, 0, 0);
+            float scale = canvas.getWidth() / (float)bitMap.getHeight();
+            float scale2 = canvas.getHeight() / (float)bitMap.getWidth();
+            if(scale2 > scale){
+                scale = scale2;
+            }
+            if(0 != scale){
+                canvas.scale(scale, scale, 0, 0 );
+            }
+            */
+            // end
+
+            canvas.drawBitmap(bitMap, new Rect(0, 0, bitMap.getWidth(), bitMap.getHeight()),
+                    new Rect(0, 0, canvas.getWidth(), canvas.getHeight()), null);
+            mOpenCVHolder.unlockCanvasAndPost(canvas);
+        }
+    }
+
 }
