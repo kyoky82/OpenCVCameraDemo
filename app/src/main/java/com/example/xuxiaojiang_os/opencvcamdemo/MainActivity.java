@@ -25,6 +25,10 @@ import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.IOException;
+import java.util.Vector;
+
+import static org.opencv.core.Core.merge;
+import static org.opencv.core.Core.split;
 
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
@@ -205,12 +209,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             Log.d(Tag, "convert yuv to bgr time: " + (cvtend - start));
 
             // Do opencv process
-            doOpenCvProcess(bgr_i420, mAction);
+            Mat dstMat = bgr_i420.clone();
+            doOpenCvProcess(bgr_i420, dstMat, mAction);
 
             long procend = System.currentTimeMillis();
             Log.d(Tag, "opencv process time: " + (procend - cvtend));
 
-            showOpenCvView(bgr_i420, w, h);
+            showOpenCvView(dstMat, w, h);
             long showView = System.currentTimeMillis();
             Log.d(Tag, "opencv showView time: " + (showView - procend));
 
@@ -230,16 +235,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             return null;
         }
 
-        private void doOpenCvProcess(Mat mat, int action){
+        private void doOpenCvProcess(Mat src, Mat dst, int action){
             switch(action){
                 case ACTION_CONTRAST:
-                    contrastProc(mat);
+                    contrastProc(src, dst);
                     break;
                 case ACTION_BRIGHTNESS:
-                    brightnessProc(mat);
+                    brightnessProc(src, dst);
                     break;
                 case ACTION_SATURATION:
-                    saturationProc(mat);
+                    saturationProc(src, dst);
                     break;
                 case ACTION_NONE:
                 default:
@@ -247,16 +252,30 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             }
         }
 
-        private void contrastProc(Mat mat){
+        private void contrastProc(Mat src, Mat dst){
             Log.d(Tag, "contrast process enter!");
+            // BGR图像转化为YCbCr
+            Mat ycrcb = new Mat();
+            Imgproc.cvtColor(src,ycrcb, Imgproc.COLOR_BGR2YCrCb);
+            // 图像通道分离
+            Vector<Mat> channels = new Vector<Mat>(5);
+            split(ycrcb, channels);
+            // 只均衡Y通道
+            Imgproc.equalizeHist(channels.elementAt(0), channels.elementAt(0));
+            // 合并通道
+            merge(channels, ycrcb);
+            // 将YCrCb转换为BGR格式
+            Imgproc.cvtColor(ycrcb, dst, Imgproc.COLOR_YCrCb2BGR);
         }
 
-        private void brightnessProc(Mat mat){
+        private void brightnessProc(Mat src, Mat dst){
             Log.d(Tag, "brightness process enter!");
+            src.convertTo(dst, -1, 2.2, 50);
         }
 
-        private void saturationProc(Mat mat){
+        private void saturationProc(Mat src, Mat dst){
             Log.d(Tag, "saturation process enter!");
+            Imgproc.cvtColor(src, dst, Imgproc.COLOR_BGR2GRAY);
         }
     }
 
@@ -275,7 +294,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     private void showOpenCvView(Mat mat, int width, int height){
         Bitmap bitMap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-
         if(null == mat){
             return;
         }
@@ -284,20 +302,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         Canvas canvas = mOpenCVHolder.lockCanvas();
         if(null != canvas){
             canvas.drawColor(0, PorterDuff.Mode.CLEAR );
-
-            // 修改预览旋转90度问题
-            /*
-            canvas.rotate(90, 0, 0);
-            float scale = canvas.getWidth() / (float)bitMap.getHeight();
-            float scale2 = canvas.getHeight() / (float)bitMap.getWidth();
-            if(scale2 > scale){
-                scale = scale2;
-            }
-            if(0 != scale){
-                canvas.scale(scale, scale, 0, 0 );
-            }
-            */
-            // end
 
             canvas.drawBitmap(bitMap, new Rect(0, 0, bitMap.getWidth(), bitMap.getHeight()),
                     new Rect(0, 0, canvas.getWidth(), canvas.getHeight()), null);
